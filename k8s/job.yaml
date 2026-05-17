@@ -1,0 +1,133 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mdlm-experiment-job
+  namespace: ucsd-qswang-lab
+  labels:
+    app: mdlm
+    type: experiment
+spec:
+  # Job configuration
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400  # Keep job for 24 hours after completion
+
+  template:
+    metadata:
+      labels:
+        app: mdlm
+        type: experiment
+    spec:
+      # Pod restart policy
+      restartPolicy: Never
+
+      # Node affinity: prefer A6000 GPU (48GB VRAM)
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: nvidia.com/gpu.product
+                operator: In
+                values:
+                - NVIDIA-RTX-A6000
+
+      # GPU container
+      containers:
+      - name: mdlm-experiment
+        image: prathamagg/mdlm:latest
+        imagePullPolicy: Always
+
+        # Args to pass to full.py
+        args:
+        - full.py
+
+        # Environment variables
+        env:
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: mdlm-secrets
+              key: hf-token
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: EXPERIMENT_ID
+          value: "exp-001"
+
+        # GPU and resource requirements (NRP.ai enforces 1.2 max CPU:memory ratio)
+        resources:
+          requests:
+            nvidia.com/gpu: 1       # 1 GPU
+            memory: "30Gi"          # Need 30Gi for CPU offloading (10Gi GPU + 20Gi CPU)
+            cpu: "8"
+          limits:
+            nvidia.com/gpu: 1
+            memory: "30Gi"
+            cpu: "8"
+
+        # Volume mounts for persistence
+        volumeMounts:
+        - name: results
+          mountPath: /app/results
+        - name: checkpoint
+          mountPath: /app/.checkpoint
+        - name: cache
+          mountPath: /app/.cache_files
+
+        # Security context
+        securityContext:
+          runAsUser: 0
+          allowPrivilegeEscalation: false
+
+      # Pod volumes
+      volumes:
+      - name: results
+        persistentVolumeClaim:
+          claimName: mdlm-results-pvc
+      - name: checkpoint
+        persistentVolumeClaim:
+          claimName: mdlm-checkpoint-pvc
+      - name: cache
+        emptyDir:
+          sizeLimit: 10Gi
+
+---
+# PersistentVolumeClaim for results
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mdlm-results-pvc
+  namespace: ucsd-qswang-lab
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: rook-ceph-block  # Default NRP.ai storage class
+
+---
+# PersistentVolumeClaim for checkpoints
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mdlm-checkpoint-pvc
+  namespace: ucsd-qswang-lab
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: rook-ceph-block
+
+---
+# Secret for HuggingFace token
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mdlm-secrets
+  namespace: ucsd-qswang-lab
+type: Opaque
+stringData:
+  hf-token: REPLACE_WITH_YOUR_HF_TOKEN

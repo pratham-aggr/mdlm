@@ -1,0 +1,53 @@
+version: '3.9'
+
+services:
+  mdlm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: mdlm:latest
+    container_name: mdlm-experiment
+
+    # GPU support
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - CUDA_VISIBLE_DEVICES=0
+      - HF_TOKEN=${HF_TOKEN}
+      - PYTHONUNBUFFERED=1
+
+    # Volume mounts
+    volumes:
+      - ./results:/app/results
+      - ./checkpoint:/app/.checkpoint
+      - ./.cache_files:/app/.cache_files
+
+    # Resource limits
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Keep container running for interactive sessions
+    stdin_open: true
+    tty: true
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "python3.12", "-c", "import torch; print(torch.cuda.is_available())"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

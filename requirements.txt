@@ -1,0 +1,16 @@
+# Core dependencies for LLADA-8B-Instruct and Activation Steering
+
+# Model and transformers (pinned for compatibility)
+transformers==4.44.2
+accelerate>=0.25.0
+huggingface-hub>=0.19.0
+torch>=2.0.0
+
+# Data handling
+datasets>=2.14.0
+tqdm>=4.66.0
+numpy>=1.24.0
+pandas>=1.5.0
+
+# Utilities
+einops>=0.7.0

@@ -1,0 +1,38 @@
+name: mdlm
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  # Python version
+  - python=3.11
+
+  # PyTorch with CUDA support
+  - pytorch::pytorch
+  - pytorch::pytorch-cuda=12.1
+  - pytorch::cudnn
+
+  # Data science
+  - numpy>=1.24.0
+  - pandas>=1.5.0
+  - scipy
+  - scikit-learn
+  - pip
+
+  # Utilities
+  - git
+  - ipython
+  - jupyter
+
+  # pip packages
+  - pip:
+    - transformers==4.44.2
+    - accelerate>=0.25.0
+    - huggingface-hub>=0.19.0
+    - bitsandbytes>=0.42.0
+    - datasets>=2.14.0
+    - tqdm>=4.66.0
+    - einops>=0.7.0
+    - matplotlib
+    - seaborn
+    - tensorboard

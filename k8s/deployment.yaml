@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mdlm-app
+  namespace: ucsd-qswang-lab
+  labels:
+    app: mdlm
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mdlm
+  template:
+    metadata:
+      labels:
+        app: mdlm
+    spec:
+      restartPolicy: OnFailure
+
+      # GPU resource request
+      containers:
+      - name: mdlm
+        image: mdlm:latest
+        imagePullPolicy: IfNotPresent
+
+        # Environment variables
+        env:
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: mdlm-secrets
+              key: hf-token
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+
+        # Resource requests and limits
+        resources:
+          requests:
+            nvidia.com/gpu: 1  # Request 1 GPU
+            memory: "8Gi"
+            cpu: "4"
+          limits:
+            nvidia.com/gpu: 1
+            memory: "16Gi"
+            cpu: "8"
+
+        # Volume mounts
+        volumeMounts:
+        - name: data
+          mountPath: /app/results
+        - name: cache
+          mountPath: /app/.checkpoint
+
+        # Probes
+        livenessProbe:
+          exec:
+            command:
+            - python3.12
+            - -c
+            - "import torch; torch.cuda.is_available()"
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+
+        readinessProbe:
+          exec:
+            command:
+            - python3.12
+            - -c
+            - "import torch, transformers; print('Ready')"
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+
+      # Volumes
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mdlm-data-pvc
+      - name: cache
+        persistentVolumeClaim:
+          claimName: mdlm-cache-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mdlm-service
+  namespace: ucsd-qswang-lab
+spec:
+  selector:
+    app: mdlm
+  ports:
+  - protocol: TCP
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP
