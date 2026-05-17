@@ -14,10 +14,8 @@ def _format_prompt(tokenizer, prompt_str):
     )
 
 
-def _make_steer_hook(v, prompt_len, steer_positions, hook_fire_count=None, alpha=None):
+def _make_steer_hook(v, prompt_len, steer_positions, alpha=None):
     def hook_fn(module, input, output):
-        if hook_fire_count is not None:
-            hook_fire_count[0] += 1
         is_tuple  = isinstance(output, tuple)
         hs        = output[0] if is_tuple else output   # (batch, seq_len, d_model)
 
@@ -72,7 +70,6 @@ def generate_with_measurements(
     device  = next(model.parameters()).device
     GEN_LEN = config.GEN_LEN
     STEPS   = config.STEPS
-    hook_fire_count = [0]
     # ------------------------------------------------------------------ setup
     formatted  = _format_prompt(tokenizer, prompt_str)
     inputs     = tokenizer(formatted, return_tensors="pt",
@@ -120,7 +117,6 @@ def generate_with_measurements(
                 steering_vector,
                 prompt_len,
                 condition.get('steer_positions', 'all'),
-                hook_fire_count,
                 alpha=condition.get('steering_alpha', None),
             )
             for layer_idx in condition['steer_layers']:
@@ -135,10 +131,6 @@ def generate_with_measurements(
         finally:
             for h in steer_handles:
                 h.remove()
-
-        if step == 0:
-            print(f"[DEBUG] Hooks fired: {hook_fire_count[0]}  "
-                  f"(expected: {len(condition['steer_layers'])})")
 
         # ---- extract response-region quantities
         # cast to float32 before softmax: float16 underflows to exact 0 for

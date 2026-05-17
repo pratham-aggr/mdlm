@@ -60,4 +60,11 @@ CONDITIONS = {
         'save_hidden_states': False,
         'description':        'Early layers only (0-8)',
     },
+    'I': {
+        'steer_layers':       LAYERS_ALL,
+        'steer_positions':    'prompt_only',
+        'steer_when':         'last_20pct',
+        'save_hidden_states': False,
+        'description':        'Proposed fix — prompt only, late steps',
+    },
 }
